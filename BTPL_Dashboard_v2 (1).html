@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BTPL Dispatch Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--bg:#0f1117;--sf:#1a1d27;--sf2:#222636;--bd:#2e3348;--tx:#e8eaf6;--tx2:#8b90a8;--ac:#2a78d6;--radius:8px;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;border-bottom:1px solid var(--bd);background:var(--sf);}
+.hdr-left{display:flex;align-items:center;gap:14px;}
+.logo{width:42px;height:42px;background:#2a78d6;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px;color:#fff;flex-shrink:0;}
+.hdr-title{font-size:17px;font-weight:700;}
+.hdr-sub{font-size:12px;color:var(--tx2);margin-top:2px;}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.badge{font-size:12px;color:var(--tx2);border:1px solid var(--bd);border-radius:var(--radius);padding:5px 14px;background:var(--sf2);}
+.refresh-btn{font-size:12px;color:#fff;background:#2a78d6;border:none;border-radius:var(--radius);padding:7px 18px;cursor:pointer;font-weight:600;}
+.refresh-btn:hover{background:#1d5fb0;}
+.refresh-btn:disabled{opacity:.5;cursor:not-allowed;}
+.loading-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;gap:16px;}
+.spinner{width:40px;height:40px;border:3px solid var(--bd);border-top-color:#2a78d6;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-size:14px;color:var(--tx2);}
+.error-box{background:#2a1418;border:1px solid #5c2a30;border-radius:12px;padding:20px;margin:24px 28px;color:#ff8a8a;font-size:13px;}
+.tabs{display:flex;gap:2px;padding:12px 28px 0;border-bottom:1px solid var(--bd);background:var(--sf);}
+.tab{padding:9px 22px;font-size:13px;font-weight:500;color:var(--tx2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
+.tab:hover{color:var(--tx);}
+.tab.on{color:#2a78d6;border-bottom-color:#2a78d6;}
+.wrap{padding:24px 28px;}
+.pane{display:none;}.pane.on{display:block;}
+
+/* KPI CARDS */
+.krow{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:22px;}
+.kc{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:16px;border-top:3px solid var(--bd);}
+.kc.bl{border-top-color:#2a78d6;}.kc.gr{border-top-color:#1baf7a;}.kc.am{border-top-color:#eda100;}
+.kc.vi{border-top-color:#4a3aa7;}.kc.or{border-top-color:#eb6834;}.kc.te{border-top-color:#008300;}.kc.gy{border-top-color:#888780;}
+.klbl{font-size:10px;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.kval{font-size:22px;font-weight:800;line-height:1;}
+.ksub{font-size:11px;color:var(--tx2);margin-top:5px;}
+
+/* CHARTS */
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px;}
+.cgrid.one{grid-template-columns:1fr;}
+@media(max-width:700px){.cgrid{grid-template-columns:1fr;}}
+.cc{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:18px;}
+.ctit{font-size:14px;font-weight:600;margin-bottom:3px;}
+.csub{font-size:11px;color:var(--tx2);margin-bottom:14px;}
+.leg{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px;font-size:11px;color:var(--tx2);}
+.legdot{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:middle;}
+
+/* TABLE */
+.tc{background:var(--sf);border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+.thdr{padding:13px 16px;border-bottom:1px solid var(--bd);font-size:14px;font-weight:600;}
+table{width:100%;border-collapse:collapse;}
+th{padding:9px 14px;text-align:left;font-size:10px;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--bd);background:var(--sf2);}
+td{padding:10px 14px;font-size:13px;border-bottom:1px solid rgba(46,51,72,.4);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(42,120,214,.04);}
+.bar{display:flex;align-items:center;gap:10px;}
+.bfill{height:5px;border-radius:3px;min-width:4px;}
+
+/* LOOKUP TAB */
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+@media(max-width:600px){.filters{grid-template-columns:1fr;}}
+.filter-box{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:16px;}
+.filter-label{font-size:11px;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;font-weight:600;}
+.search-wrap{position:relative;}
+.search-input{width:100%;padding:10px 14px;background:var(--sf2);color:var(--tx);border:1px solid var(--bd);border-radius:8px;font-size:13px;outline:none;}
+.search-input:focus{border-color:#2a78d6;}
+.dropdown-list{position:absolute;top:100%;left:0;right:0;background:var(--sf2);border:1px solid var(--bd);border-radius:8px;max-height:220px;overflow-y:auto;z-index:100;display:none;margin-top:4px;}
+.dropdown-item{padding:9px 14px;font-size:12px;cursor:pointer;border-bottom:1px solid rgba(46,51,72,.3);}
+.dropdown-item:last-child{border-bottom:none;}
+.dropdown-item:hover{background:rgba(42,120,214,.1);color:#2a78d6;}
+.dropdown-item.selected{color:#2a78d6;font-weight:600;}
+.period-btns{display:flex;flex-wrap:wrap;gap:6px;}
+.period-btn{padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid var(--bd);color:var(--tx2);background:var(--sf2);transition:all .15s;}
+.period-btn:hover{color:var(--tx);}
+.period-btn.on{background:#2a78d6;border-color:#2a78d6;color:#fff;}
+.date-range{display:flex;gap:10px;align-items:center;margin-top:10px;display:none;}
+.date-range.show{display:flex;}
+.date-input{padding:8px 12px;background:var(--sf2);color:var(--tx);border:1px solid var(--bd);border-radius:8px;font-size:12px;outline:none;}
+.date-input:focus{border-color:#2a78d6;}
+.apply-btn{padding:8px 16px;background:#2a78d6;color:#fff;border:none;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;}
+.apply-btn:hover{background:#1d5fb0;}
+.result-header{background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.result-title{font-size:15px;font-weight:700;}
+.result-meta{font-size:12px;color:var(--tx2);}
+.result-stats{display:flex;gap:20px;}
+.rstat{text-align:center;}
+.rstat-val{font-size:20px;font-weight:800;color:#2a78d6;}
+.rstat-lbl{font-size:10px;color:var(--tx2);text-transform:uppercase;letter-spacing:.4px;}
+.empty-state{text-align:center;padding:60px 20px;color:var(--tx2);}
+.empty-state .icon{font-size:48px;margin-bottom:12px;}
+.empty-state p{font-size:14px;}
+#dashboard-content{display:none;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-left">
+    <div class="logo">B</div>
+    <div>
+      <div class="hdr-title">BTPL Dispatch Dashboard</div>
+      <div class="hdr-sub">Brevera Technologies Pvt. Ltd. &middot; Live from Google Sheet</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="badge" id="lastUpdated">Connecting...</div>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadData()">Refresh</button>
+  </div>
+</div>
+
+<div id="loadingScreen" class="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-text">Loading live data from Google Sheet...</div>
+</div>
+<div id="errorBox" class="error-box" style="display:none"></div>
+
+<div id="dashboard-content">
+<div class="tabs">
+  <div class="tab on" onclick="sw('ov',this)">Overview</div>
+  <div class="tab" onclick="sw('lk',this)">Dispatch Lookup</div>
+</div>
+
+<div class="wrap">
+
+<!-- ══ OVERVIEW ══ -->
+<div class="pane on" id="pov">
+  <div class="krow" id="ovkrow"></div>
+  <div class="cgrid">
+    <div class="cc">
+      <div class="ctit">Group-wise dispatch</div>
+      <div class="csub">Total qty per group</div>
+      <div style="position:relative;height:240px"><canvas id="c1"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="ctit">Group share</div>
+      <div class="csub">% contribution of each group</div>
+      <div class="leg" id="pleg"></div>
+      <div style="position:relative;height:200px"><canvas id="c2"></canvas></div>
+    </div>
+  </div>
+  <div class="cgrid one">
+    <div class="cc">
+      <div class="ctit">Monthly trend</div>
+      <div class="csub">Total dispatch qty per month (Financial Year)</div>
+      <div style="position:relative;height:200px"><canvas id="c3"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DISPATCH LOOKUP ══ -->
+<div class="pane" id="plk">
+  <div class="filters">
+    <div class="filter-box">
+      <div class="filter-label">Search Product / PCB</div>
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="productSearch" placeholder="Type to search item..." autocomplete="off" oninput="filterProducts()" onfocus="showDropdown('product')" onblur="hideDropdown('product')"/>
+        <div class="dropdown-list" id="productDropdown"></div>
+      </div>
+    </div>
+    <div class="filter-box">
+      <div class="filter-label">Search Plant (optional)</div>
+      <div class="search-wrap">
+        <input type="text" class="search-input" id="plantSearch" placeholder="Type to search plant..." autocomplete="off" oninput="filterPlants()" onfocus="showDropdown('plant')" onblur="hideDropdown('plant')"/>
+        <div class="dropdown-list" id="plantDropdown"></div>
+      </div>
+    </div>
+  </div>
+  <div class="filter-box" style="margin-bottom:20px">
+    <div class="filter-label">Time Period</div>
+    <div class="period-btns">
+      <div class="period-btn on" onclick="setPeriod('today',this)">Today</div>
+      <div class="period-btn" onclick="setPeriod('week',this)">This Week</div>
+      <div class="period-btn" onclick="setPeriod('month',this)">This Month</div>
+      <div class="period-btn" onclick="setPeriod('year',this)">This Year</div>
+      <div class="period-btn" onclick="setPeriod('fy',this)">Financial Year</div>
+      <div class="period-btn" onclick="setPeriod('custom',this)">Custom</div>
+    </div>
+    <div class="date-range" id="dateRange">
+      <input type="date" class="date-input" id="fromDate"/>
+      <span style="color:var(--tx2)">to</span>
+      <input type="date" class="date-input" id="toDate"/>
+      <button class="apply-btn" onclick="applyCustom()">Apply</button>
+    </div>
+  </div>
+  <div id="lookupResult">
+    <div class="empty-state">
+      <div class="icon">🔍</div>
+      <p>Search for a product or plant above to see dispatch data</p>
+    </div>
+  </div>
+</div>
+
+</div>
+</div>
+
+<script>
+var API_URL = 'https://script.google.com/macros/s/AKfycby0yhLOSq-IvHb_Be76Akc_E-z-R3OfRyzhLh2cfmroAsXYxVJeRhVrtq72VtZZcwX8Sg/exec';
+var GC = ['#2a78d6','#1baf7a','#eb6834','#888780','#4a3aa7','#eda100','#008300'];
+var kCls = ['bl','gr','am','gy','vi','or','te'];
+var gridC = '#2c2c2a', textC = '#8b90a8';
+var cx = {}, DATA = null;
+var selectedProduct = null, selectedPlant = null, selectedPeriod = 'today';
+var customFrom = null, customTo = null;
+
+function fmt(n) {
+  n = Math.round(n);
+  if (n >= 10000000) return (n/10000000).toFixed(2) + ' Cr';
+  if (n >= 100000)   return (n/100000).toFixed(2) + ' L';
+  if (n >= 1000)     return (n/1000).toFixed(1) + 'K';
+  return String(n);
+}
+function ff(n) { return Math.round(n).toLocaleString('en-IN'); }
+
+function loadData() {
+  document.getElementById('loadingScreen').style.display = 'flex';
+  document.getElementById('dashboard-content').style.display = 'none';
+  document.getElementById('errorBox').style.display = 'none';
+  document.getElementById('refreshBtn').disabled = true;
+  document.getElementById('lastUpdated').textContent = 'Connecting...';
+
+  fetch(API_URL)
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(data) {
+      DATA = data;
+      document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'});
+      renderOverview();
+      document.getElementById('loadingScreen').style.display = 'none';
+      document.getElementById('dashboard-content').style.display = 'block';
+      document.getElementById('refreshBtn').disabled = false;
+    })
+    .catch(function(err) {
+      document.getElementById('loadingScreen').style.display = 'none';
+      document.getElementById('errorBox').style.display = 'block';
+      document.getElementById('errorBox').textContent = 'Connection failed: ' + err.message;
+      document.getElementById('refreshBtn').disabled = false;
+      document.getElementById('lastUpdated').textContent = 'Connection failed';
+    });
+}
+
+function sw(id,el) {
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+  document.querySelectorAll('.pane').forEach(function(p){p.classList.remove('on');});
+  el.classList.add('on');
+  document.getElementById('p'+id).classList.add('on');
+}
+
+function mk(id,cfg){if(cx[id])cx[id].destroy();cx[id]=new Chart(document.getElementById(id),cfg);}
+var baseOpts={responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}};
+
+function buildLeg(id,groups,colors){
+  document.getElementById(id).innerHTML=groups.map(function(g,i){
+    return '<span><span class="legdot" style="background:'+colors[i]+'"></span>'+g+'</span>';
+  }).join('');
+}
+
+// ══ OVERVIEW ══
+function renderOverview() {
+  var D = DATA;
+  var colors = D.groups.map(function(g,i){return GC[i%GC.length];});
+
+  var html = '<div class="kc bl"><div class="klbl">Total dispatched</div><div class="kval">'+fmt(D.total)+'</div><div class="ksub">'+ff(D.totalDNs)+' delivery notes</div></div>';
+  D.groups.slice(0,5).forEach(function(g,i){
+    var pct = ((D.qtys[i]/D.total)*100).toFixed(1);
+    html += '<div class="kc '+kCls[(i+1)%kCls.length]+'"><div class="klbl">'+g+'</div><div class="kval">'+fmt(D.qtys[i])+'</div><div class="ksub">'+pct+'% share</div></div>';
+  });
+  document.getElementById('ovkrow').innerHTML = html;
+
+  mk('c1',{type:'bar',data:{labels:D.groups,datasets:[{data:D.qtys,backgroundColor:colors,borderRadius:5,borderSkipped:false}]},
+    options:Object.assign({},baseOpts,{scales:{
+      x:{ticks:{color:textC,font:{size:10}},grid:{color:'transparent'},border:{display:false}},
+      y:{ticks:{color:textC,callback:function(v){return fmt(v);}},grid:{color:gridC},border:{display:false}}
+    }})});
+
+  buildLeg('pleg',D.groups,colors);
+  mk('c2',{type:'doughnut',data:{labels:D.groups,datasets:[{data:D.qtys,backgroundColor:colors,borderWidth:2,borderColor:'#0f1117'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',plugins:{legend:{display:false}}}});
+
+  mk('c3',{type:'line',data:{labels:D.months,datasets:[{data:D.mQtys,borderColor:'#2a78d6',backgroundColor:'rgba(42,120,214,.1)',fill:true,tension:.4,pointBackgroundColor:'#2a78d6',pointRadius:5,pointHoverRadius:7}]},
+    options:Object.assign({},baseOpts,{scales:{
+      x:{ticks:{color:textC,font:{size:10}},grid:{color:'transparent'},border:{display:false}},
+      y:{ticks:{color:textC,callback:function(v){return fmt(v);}},grid:{color:gridC},border:{display:false}}
+    }})});
+}
+
+// ══ PRODUCT SEARCH ══
+function filterProducts() {
+  var q = document.getElementById('productSearch').value.toLowerCase().trim();
+  var list = DATA ? (DATA.allProducts || []) : [];
+  var filtered = q ? list.filter(function(p){return p.toLowerCase().indexOf(q)!==-1;}) : list;
+  var dd = document.getElementById('productDropdown');
+  dd.innerHTML = filtered.slice(0,50).map(function(p){
+    return '<div class="dropdown-item'+(p===selectedProduct?' selected':'')+'" onmousedown="selectProduct(\''+p.replace(/'/g,"\\'").replace(/"/g,'&quot;')+'\')" title="'+p+'">'+p+'</div>';
+  }).join('') || '<div class="dropdown-item" style="color:var(--tx2)">No results</div>';
+  dd.style.display = 'block';
+}
+
+// ══ PLANT SEARCH ══
+function filterPlants() {
+  var q = document.getElementById('plantSearch').value.toLowerCase().trim();
+  var list = DATA ? (DATA.allPlants || []) : [];
+  var filtered = q ? list.filter(function(p){return p.toLowerCase().indexOf(q)!==-1;}) : list;
+  var dd = document.getElementById('plantDropdown');
+  dd.innerHTML = filtered.slice(0,30).map(function(p){
+    return '<div class="dropdown-item'+(p===selectedPlant?' selected':'')+'" onmousedown="selectPlant(\''+p.replace(/'/g,"\\'")+'\')" title="'+p+'">'+p+'</div>';
+  }).join('') || '<div class="dropdown-item" style="color:var(--tx2)">No results</div>';
+  dd.style.display = 'block';
+}
+
+function showDropdown(type) {
+  if (type === 'product') filterProducts();
+  else filterPlants();
+}
+function hideDropdown(type) {
+  setTimeout(function(){
+    var id = type === 'product' ? 'productDropdown' : 'plantDropdown';
+    document.getElementById(id).style.display = 'none';
+  }, 200);
+}
+
+function selectProduct(p) {
+  selectedProduct = p;
+  document.getElementById('productSearch').value = p;
+  document.getElementById('productDropdown').style.display = 'none';
+  runLookup();
+}
+
+function selectPlant(p) {
+  selectedPlant = p;
+  document.getElementById('plantSearch').value = p;
+  document.getElementById('plantDropdown').style.display = 'none';
+  runLookup();
+}
+
+// ══ PERIOD FILTER ══
+function setPeriod(p, el) {
+  selectedPeriod = p;
+  document.querySelectorAll('.period-btn').forEach(function(b){b.classList.remove('on');});
+  el.classList.add('on');
+  var dr = document.getElementById('dateRange');
+  if (p === 'custom') { dr.classList.add('show'); return; }
+  dr.classList.remove('show');
+  if (selectedProduct || selectedPlant) runLookup();
+}
+
+function applyCustom() {
+  customFrom = document.getElementById('fromDate').value;
+  customTo = document.getElementById('toDate').value;
+  if (!customFrom || !customTo) { alert('Please select both dates.'); return; }
+  if (selectedProduct || selectedPlant) runLookup();
+}
+
+function getDateRange() {
+  var now = new Date();
+  var today = now.toISOString().split('T')[0];
+  if (selectedPeriod === 'today') return {from:today, to:today};
+  if (selectedPeriod === 'week') {
+    var day = now.getDay();
+    var mon = new Date(now); mon.setDate(now.getDate() - (day===0?6:day-1));
+    return {from:mon.toISOString().split('T')[0], to:today};
+  }
+  if (selectedPeriod === 'month') {
+    return {from:now.getFullYear()+'-'+(now.getMonth()+1<10?'0':'')+(now.getMonth()+1)+'-01', to:today};
+  }
+  if (selectedPeriod === 'year') return {from:now.getFullYear()+'-01-01', to:today};
+  if (selectedPeriod === 'fy') {
+    if (now.getMonth() >= 3) return {from:now.getFullYear()+'-04-01', to:(now.getFullYear()+1)+'-03-31'};
+    return {from:(now.getFullYear()-1)+'-04-01', to:now.getFullYear()+'-03-31'};
+  }
+  if (selectedPeriod === 'custom') return {from:customFrom, to:customTo};
+  return {from:'2000-01-01', to:today};
+}
+
+function runLookup() {
+  if (!DATA) return;
+  if (!selectedProduct && !selectedPlant) return;
+
+  var range = getDateRange();
+  var fromDate = new Date(range.from);
+  var toDate = new Date(range.to); toDate.setHours(23,59,59);
+
+  var rows = DATA.rows || [];
+  var filtered = rows.filter(function(r) {
+    if (selectedProduct && r[1] !== selectedProduct) return false;
+    if (selectedPlant && r[5] !== selectedPlant) return false;
+    if (!r[0]) return false;
+    var d = new Date(r[0]);
+    return d >= fromDate && d <= toDate;
+  });
+
+  var totalQty = filtered.reduce(function(s,r){return s+r[2];},0);
+
+  var byDate = {}, byPlant = {}, byProduct = {}, byMonth = {};
+  filtered.forEach(function(r) {
+    var d = r[0]||'Unknown';
+    byDate[d] = (byDate[d]||0) + r[2];
+    var plant = r[5]||'Unknown';
+    byPlant[plant] = (byPlant[plant]||0) + r[2];
+    byProduct[r[1]] = (byProduct[r[1]]||0) + r[2];
+    if (r[0]) {
+      var parts = r[0].split('-');
+      var ml = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(parts[1])-1]+'-'+parts[0];
+      byMonth[ml] = (byMonth[ml]||0) + r[2];
+    }
+  });
+  var dates = Object.keys(byDate).sort();
+  var plants = Object.keys(byPlant).sort(function(a,b){return byPlant[b]-byPlant[a];});
+  var products = Object.keys(byProduct).sort(function(a,b){return byProduct[b]-byProduct[a];});
+
+  var periodLabel = {today:'Today',week:'This Week',month:'This Month',year:'This Year',fy:'Financial Year',custom:'Custom Range'}[selectedPeriod];
+  var searchLabel = (selectedProduct||'All Products') + (selectedPlant?' → '+selectedPlant:'');
+
+  var html = '';
+
+  // ── TOTAL BANNER ──
+  html += '<div style="background:linear-gradient(135deg,#1a2744,#0f1117);border:1px solid #2a78d6;border-radius:14px;padding:20px 24px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">';
+  html += '<div><div style="font-size:13px;color:#8b90a8;margin-bottom:4px;">'+searchLabel+' &middot; '+periodLabel+'</div>';
+  html += '<div style="font-size:12px;color:#8b90a8;">'+range.from+' to '+range.to+'</div></div>';
+  html += '<div style="display:flex;gap:28px;flex-wrap:wrap;">';
+  html += '<div style="text-align:center"><div style="font-size:32px;font-weight:900;color:#2a78d6">'+ff(totalQty)+'</div><div style="font-size:11px;color:#8b90a8;text-transform:uppercase;letter-spacing:.5px">Total Qty Dispatched</div></div>';
+  html += '<div style="text-align:center"><div style="font-size:32px;font-weight:900;color:#1baf7a">'+fmt(totalQty)+'</div><div style="font-size:11px;color:#8b90a8;text-transform:uppercase;letter-spacing:.5px">In Indian Units</div></div>';
+  html += '<div style="text-align:center"><div style="font-size:32px;font-weight:900;color:#eda100">'+filtered.length+'</div><div style="font-size:11px;color:#8b90a8;text-transform:uppercase;letter-spacing:.5px">Dispatch Entries</div></div>';
+  html += '</div></div>';
+
+  if (totalQty === 0) {
+    html += '<div class="empty-state"><div class="icon">📭</div><p>No dispatch found for the selected filters and period.</p></div>';
+    document.getElementById('lookupResult').innerHTML = html;
+    return;
+  }
+
+  // ── CHART ──
+  var chartLabels = dates, chartData = dates.map(function(d){return byDate[d];});
+  if (selectedPeriod==='fy'||selectedPeriod==='year'||(selectedPeriod==='custom'&&dates.length>31)) {
+    chartLabels = Object.keys(byMonth);
+    chartData = chartLabels.map(function(m){return byMonth[m];});
+  }
+  html += '<div class="cc" style="margin-bottom:16px"><div class="ctit">Dispatch trend</div><div class="csub">Qty dispatched over selected period</div><div style="position:relative;height:200px"><canvas id="lkChart"></canvas></div></div>';
+
+  // ── PLANT BREAKDOWN (when product selected) ──
+  if (selectedProduct && plants.length > 0) {
+    html += '<div class="tc"><div class="thdr">Plant-wise breakdown — '+selectedProduct+'</div>';
+    html += '<table><thead><tr><th>#</th><th>Plant</th><th>Qty Dispatched</th><th>% Share</th></tr></thead><tbody>';
+    plants.forEach(function(p,i) {
+      var q = byPlant[p];
+      var pct = totalQty ? ((q/totalQty)*100).toFixed(1) : '0.0';
+      var w = Math.round((q/byPlant[plants[0]])*100);
+      html += '<tr><td style="color:'+textC+';font-size:11px">'+(i+1)+'</td><td style="font-weight:600">'+p+'</td>';
+      html += '<td><div class="bar"><div class="bfill" style="width:'+w+'%;background:#2a78d6;max-width:120px"></div><b>'+ff(q)+'</b></div></td>';
+      html += '<td style="color:'+textC+'">'+pct+'%</td></tr>';
+    });
+    html += '<tr style="background:rgba(42,120,214,.08);font-weight:700"><td></td><td>Total</td><td style="color:#2a78d6">'+ff(totalQty)+'</td><td>100%</td></tr>';
+    html += '</tbody></table></div>';
+  }
+
+  // ── PRODUCT BREAKDOWN (when plant selected, no product) ──
+  if (selectedPlant && !selectedProduct && products.length > 0) {
+    html += '<div class="tc"><div class="thdr">Product-wise breakdown — '+selectedPlant+'</div>';
+    html += '<table><thead><tr><th>#</th><th>Product</th><th>Qty Dispatched</th><th>% Share</th></tr></thead><tbody>';
+    products.slice(0,20).forEach(function(p,i) {
+      var q = byProduct[p];
+      var pct = totalQty ? ((q/totalQty)*100).toFixed(1) : '0.0';
+      var w = Math.round((q/byProduct[products[0]])*100);
+      html += '<tr><td style="color:'+textC+';font-size:11px">'+(i+1)+'</td><td style="font-family:monospace;font-size:12px">'+p+'</td>';
+      html += '<td><div class="bar"><div class="bfill" style="width:'+w+'%;background:#1baf7a;max-width:120px"></div><b>'+ff(q)+'</b></div></td>';
+      html += '<td style="color:'+textC+'">'+pct+'%</td></tr>';
+    });
+    html += '<tr style="background:rgba(42,120,214,.08);font-weight:700"><td></td><td>Total</td><td style="color:#2a78d6">'+ff(totalQty)+'</td><td>100%</td></tr>';
+    html += '</tbody></table></div>';
+  }
+
+  // ── DATE TABLE ──
+  html += '<div class="tc"><div class="thdr">Date-wise dispatch</div>';
+  html += '<table><thead><tr><th>Date</th><th>Qty</th><th>% of period</th></tr></thead><tbody>';
+  dates.forEach(function(d) {
+    var q = byDate[d];
+    var pct = totalQty ? ((q/totalQty)*100).toFixed(1) : '0.0';
+    html += '<tr><td style="font-weight:600">'+d+'</td><td>'+ff(q)+'</td><td style="color:'+textC+'">'+pct+'%</td></tr>';
+  });
+  html += '<tr style="background:rgba(42,120,214,.08);font-weight:700"><td>Total</td><td style="color:#2a78d6">'+ff(totalQty)+'</td><td>100%</td></tr>';
+  html += '</tbody></table></div>';
+
+  // ── MONTH SUMMARY ──
+  if (Object.keys(byMonth).length > 1) {
+    html += '<div class="tc"><div class="thdr">Month-wise summary</div>';
+    html += '<table><thead><tr><th>Month</th><th>Qty</th><th>% of period</th></tr></thead><tbody>';
+    Object.keys(byMonth).forEach(function(m) {
+      var q = byMonth[m];
+      var pct = totalQty ? ((q/totalQty)*100).toFixed(1) : '0.0';
+      html += '<tr><td style="font-weight:600">'+m+'</td><td>'+ff(q)+'</td><td style="color:'+textC+'">'+pct+'%</td></tr>';
+    });
+    html += '<tr style="background:rgba(42,120,214,.08);font-weight:700"><td>Total</td><td style="color:#2a78d6">'+ff(totalQty)+'</td><td>100%</td></tr>';
+    html += '</tbody></table></div>';
+  }
+
+  document.getElementById('lookupResult').innerHTML = html;
+
+  mk('lkChart',{type:'bar',data:{labels:chartLabels,datasets:[{data:chartData,backgroundColor:'#2a78d6cc',borderColor:'#2a78d6',borderWidth:1,borderRadius:5,borderSkipped:false}]},
+    options:Object.assign({},baseOpts,{scales:{
+      x:{ticks:{color:textC,font:{size:10},maxRotation:40},grid:{color:'transparent'},border:{display:false}},
+      y:{ticks:{color:textC,callback:function(v){return fmt(v);}},grid:{color:gridC},border:{display:false}}
+    }})});
+}
+
+loadData();
+</script>
+</body>
+</html>
